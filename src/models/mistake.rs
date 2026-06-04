@@ -1,7 +1,7 @@
 // 错误笔记模型
 use serde::{Deserialize, Serialize};
 
-/// A complete mistake notebook document rendered from one conversation.
+/// 从一次会话中生成的一篇完整错题集文档。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MistakeDocument {
     pub id: String,
@@ -16,7 +16,7 @@ pub struct MistakeDocument {
 }
 
 impl MistakeDocument {
-    /// Create a mistake document with required metadata and empty optional fields.
+    /// 使用必要元数据创建错题集文档，并初始化空的可选字段。
     pub fn new(
         id: impl Into<String>,
         title: impl Into<String>,
@@ -36,7 +36,7 @@ impl MistakeDocument {
     }
 }
 
-/// One reusable lesson learned from a failed assumption, command, or workflow.
+/// 从错误假设、失败命令或工作流问题中提炼出的一条可复用错题。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Mistake {
     pub id: String,
@@ -54,7 +54,7 @@ pub struct Mistake {
 }
 
 impl Mistake {
-    /// Create a mistake item with required fields and empty evidence/tags.
+    /// 使用必要字段创建一条错题，并初始化空证据和标签。
     pub fn new(
         id: impl Into<String>,
         title: impl Into<String>,
@@ -80,7 +80,7 @@ impl Mistake {
     }
 }
 
-/// Evidence attached to a mistake, such as a command result or file path.
+/// 附加在错题上的证据，例如命令结果或文件路径。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Evidence {
     pub kind: EvidenceKind,
@@ -90,7 +90,7 @@ pub struct Evidence {
 }
 
 impl Evidence {
-    /// Create a command evidence item.
+    /// 创建命令证据。
     pub fn command(value: impl Into<String>) -> Self {
         Self {
             kind: EvidenceKind::Command,
@@ -99,7 +99,7 @@ impl Evidence {
         }
     }
 
-    /// Create a file evidence item.
+    /// 创建文件证据。
     pub fn file(value: impl Into<String>) -> Self {
         Self {
             kind: EvidenceKind::File,
@@ -107,9 +107,18 @@ impl Evidence {
             note: None,
         }
     }
+
+    /// 创建消息证据。
+    pub fn message(value: impl Into<String>) -> Self {
+        Self {
+            kind: EvidenceKind::Message,
+            value: value.into(),
+            note: None,
+        }
+    }
 }
 
-/// Evidence categories that help future search and rendering.
+/// 帮助后续搜索和渲染的证据类型。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EvidenceKind {
@@ -120,7 +129,7 @@ pub enum EvidenceKind {
     Other,
 }
 
-/// Severity of a mistake for sorting and future filtering.
+/// 用于排序和后续过滤的错题严重程度。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Severity {

@@ -1,8 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
-use detour_cli::cli::{CaptureFormat, Cli, Commands, HookCommands, SkillCommands};
+use detour_cli::capture::capture_from_args;
+use detour_cli::cli::{Cli, Commands, HookCommands, SkillCommands};
 
-// Parse CLI arguments and dispatch each subcommand to its current placeholder handler.
+// 解析命令行参数，并把每个子命令分发到对应处理逻辑。
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -13,22 +14,35 @@ fn main() -> Result<()> {
             println!("force: {}", args.force);
         }
         Commands::Capture(args) => {
-            println!("detour capture");
+            let json = args.json;
+            let result = capture_from_args(args)?;
 
-            if let Some(path) = args.from {
-                println!("from: {}", path.display());
+            if json {
+                println!("{}", serde_json::to_string_pretty(&result)?);
+            } else {
+                println!("detour capture");
+                println!("source: {}", result.source);
+                println!("dry_run: {}", result.dry_run);
+                println!("output_dir: {}", result.output_dir);
+                println!("documents: {}", result.document_count);
+
+                if result.dry_run {
+                    for document in result.documents {
+                        println!(
+                            "- {} ({} mistakes, not written)",
+                            document.title,
+                            document.mistakes.len()
+                        );
+                    }
+                } else {
+                    for saved_document in result.saved_documents {
+                        println!(
+                            "- {} ({} mistakes) -> {}",
+                            saved_document.title, saved_document.mistake_count, saved_document.path
+                        );
+                    }
+                }
             }
-
-            println!("stdin: {}", args.stdin);
-
-            if let Some(out) = args.out {
-                println!("out: {}", out.display());
-            }
-
-            println!("max_docs: {}", args.max_docs);
-            println!("format: {}", format_name(args.format));
-            println!("dry_run: {}", args.dry_run);
-            println!("json: {}", args.json);
         }
         Commands::List(args) => {
             println!("detour list");
@@ -81,12 +95,4 @@ fn main() -> Result<()> {
     }
 
     Ok(())
-}
-
-// Convert the capture format enum into the short name printed by placeholder output.
-fn format_name(format: CaptureFormat) -> &'static str {
-    match format {
-        CaptureFormat::Markdown => "md",
-        CaptureFormat::Json => "json",
-    }
 }

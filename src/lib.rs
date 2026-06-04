@@ -1,5 +1,8 @@
-//! Core data models shared by the CLI, hooks, skills, and future MCP server.
+//! CLI、hook、skills 和未来 MCP server 共用的库入口。
 
+pub mod capture;
 pub mod cli;
-pub mod conversation;
-pub mod mistake;
+pub mod extractor;
+pub mod models;
+pub mod render;
+pub mod storage;

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
-// Top-level command parser for the `detour` binary.
+// `detour` 二进制命令的顶层解析器。
 #[derive(Debug, Parser)]
 #[command(
     name = "detour",
@@ -15,76 +15,76 @@ pub struct Cli {
     pub command: Commands,
 }
 
-// All first-level commands supported by `detour`.
+// `detour` 支持的所有一级子命令。
 #[derive(Debug, Subcommand)]
 pub enum Commands {
-    /// Initialize detour configuration and local storage.
+    /// 初始化 detour 配置和本地存储。
     Init(InitArgs),
 
-    /// Capture a session and render mistake-notebook documents.
+    /// 捕获会话并生成错题集文档。
     Capture(CaptureArgs),
 
-    /// List saved mistake documents.
+    /// 列出已保存的错题集文档。
     List(ListArgs),
 
-    /// Show one saved mistake document.
+    /// 显示一篇已保存的错题集文档。
     Show(ShowArgs),
 
-    /// Search saved mistake documents.
+    /// 搜索已保存的错题集文档。
     Search(SearchArgs),
 
-    /// Manage integrations with AI tools.
+    /// 管理与 AI 工具的集成。
     Hook(HookArgs),
 
-    /// Create, print, or install LLM skills.
+    /// 创建、打印或安装 LLM skills。
     Skill(SkillArgs),
 }
 
-// Options accepted by `detour init`.
+// `detour init` 接受的参数。
 #[derive(Debug, Args)]
 pub struct InitArgs {
-    /// Directory where .detour should be created.
+    /// 创建 .detour 的目标目录。
     #[arg(long, default_value = ".")]
     pub root: PathBuf,
 
-    /// Overwrite existing generated files where supported.
+    /// 在支持的地方覆盖已有生成文件。
     #[arg(long)]
     pub force: bool,
 }
 
-// Options accepted by `detour capture`.
+// `detour capture` 接受的参数。
 #[derive(Debug, Args)]
 pub struct CaptureArgs {
-    /// Read conversation material from a file.
+    /// 从文件读取会话材料。
     #[arg(long = "from", value_name = "PATH")]
     pub from: Option<PathBuf>,
 
-    /// Read conversation material from standard input.
+    /// 从标准输入读取会话材料。
     #[arg(long)]
     pub stdin: bool,
 
-    /// Directory where mistake documents should be written.
+    /// 写入错题集文档的目录。
     #[arg(long, value_name = "DIR")]
     pub out: Option<PathBuf>,
 
-    /// Maximum number of documents to generate.
+    /// 最多生成多少篇文档。
     #[arg(long, default_value_t = 5)]
     pub max_docs: usize,
 
-    /// Output document format.
+    /// 输出文档格式。
     #[arg(long, value_enum, default_value = "md")]
     pub format: CaptureFormat,
 
-    /// Print what would happen without writing files.
+    /// 只打印将要发生的操作，不写入文件。
     #[arg(long)]
     pub dry_run: bool,
 
-    /// Print machine-readable JSON for the command result.
+    /// 用机器可读 JSON 打印命令结果。
     #[arg(long)]
     pub json: bool,
 }
 
-// Document formats supported by the capture command.
+// capture 命令支持的文档格式。
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum CaptureFormat {
     #[value(name = "md")]
@@ -92,132 +92,132 @@ pub enum CaptureFormat {
     Json,
 }
 
-// Options accepted by `detour list`.
+// `detour list` 接受的参数。
 #[derive(Debug, Args)]
 pub struct ListArgs {
-    /// Project or detour root directory.
+    /// 项目目录或 detour 根目录。
     #[arg(long, default_value = ".")]
     pub root: PathBuf,
 
-    /// Print machine-readable JSON.
+    /// 打印机器可读 JSON。
     #[arg(long)]
     pub json: bool,
 }
 
-// Options accepted by `detour show`.
+// `detour show` 接受的参数。
 #[derive(Debug, Args)]
 pub struct ShowArgs {
-    /// Document id or path to show.
+    /// 要显示的文档 ID 或路径。
     pub id_or_path: String,
 
-    /// Print machine-readable JSON.
+    /// 打印机器可读 JSON。
     #[arg(long)]
     pub json: bool,
 }
 
-// Options accepted by `detour search`.
+// `detour search` 接受的参数。
 #[derive(Debug, Args)]
 pub struct SearchArgs {
-    /// Search query.
+    /// 搜索关键词。
     pub query: String,
 
-    /// Project or detour root directory.
+    /// 项目目录或 detour 根目录。
     #[arg(long, default_value = ".")]
     pub root: PathBuf,
 
-    /// Print machine-readable JSON.
+    /// 打印机器可读 JSON。
     #[arg(long)]
     pub json: bool,
 }
 
-// Nested command group for AI-tool integrations.
+// AI 工具集成相关的嵌套命令组。
 #[derive(Debug, Args)]
 pub struct HookArgs {
     #[command(subcommand)]
     pub command: HookCommands,
 }
 
-// AI tools that can be managed by `detour hook`.
+// `detour hook` 可以管理的 AI 工具。
 #[derive(Debug, Subcommand)]
 pub enum HookCommands {
-    /// Manage Claude Code integration.
+    /// 管理 Claude Code 集成。
     Claude(ClaudeHookArgs),
 }
 
-// Nested command group for Claude Code hook integration.
+// Claude Code hook 集成的嵌套命令组。
 #[derive(Debug, Args)]
 pub struct ClaudeHookArgs {
     #[command(subcommand)]
     pub command: ClaudeHookCommands,
 }
 
-// Commands supported under `detour hook claude`.
+// `detour hook claude` 支持的命令。
 #[derive(Debug, Subcommand)]
 pub enum ClaudeHookCommands {
-    /// Detect Claude Code and detour integration status.
+    /// 检测 Claude Code 和 detour 的集成状态。
     Detect(JsonFlag),
 
-    /// Install Claude Code integration files.
+    /// 安装 Claude Code 集成文件。
     Install(ClaudeHookInstallArgs),
 
-    /// Print Claude Code integration status.
+    /// 打印 Claude Code 集成状态。
     Status(JsonFlag),
 
-    /// Print Claude Code settings snippets without writing files.
+    /// 打印 Claude Code settings 片段，不写入文件。
     PrintConfig(ClaudeHookPrintConfigArgs),
 
-    /// Remove detour Claude Code integration files.
+    /// 移除 detour 的 Claude Code 集成文件。
     Uninstall(ClaudeHookUninstallArgs),
 
-    /// Entry point intended for Claude Code PreCompact hooks.
+    /// Claude Code PreCompact hook 调用的入口。
     RunPrecompact(JsonFlag),
 }
 
-// Reusable `--json` flag shared by simple status-like commands.
+// 简单状态类命令复用的 `--json` 参数。
 #[derive(Debug, Args)]
 pub struct JsonFlag {
-    /// Print machine-readable JSON.
+    /// 打印机器可读 JSON。
     #[arg(long)]
     pub json: bool,
 }
 
-// Options accepted by `detour hook claude install`.
+// `detour hook claude install` 接受的参数。
 #[derive(Debug, Args)]
 pub struct ClaudeHookInstallArgs {
-    /// Integration mode to install.
+    /// 要安装的集成模式。
     #[arg(long, value_enum, default_value = "pre-compact")]
     pub mode: ClaudeHookMode,
 
-    /// Write user-level Claude Code settings instead of project-level settings.
+    /// 写入用户级 Claude Code settings，而不是项目级 settings。
     #[arg(long)]
     pub global: bool,
 
-    /// Overwrite existing generated files where supported.
+    /// 在支持的地方覆盖已有生成文件。
     #[arg(long)]
     pub force: bool,
 }
 
-// Options accepted by `detour hook claude print-config`.
+// `detour hook claude print-config` 接受的参数。
 #[derive(Debug, Args)]
 pub struct ClaudeHookPrintConfigArgs {
-    /// Hook event to print configuration for.
+    /// 要打印配置的 hook 事件。
     #[arg(long, value_enum, default_value = "pre-compact")]
     pub event: ClaudeHookEvent,
 }
 
-// Options accepted by `detour hook claude uninstall`.
+// `detour hook claude uninstall` 接受的参数。
 #[derive(Debug, Args)]
 pub struct ClaudeHookUninstallArgs {
-    /// Hook event to remove.
+    /// 要移除的 hook 事件。
     #[arg(long, value_enum, default_value = "pre-compact")]
     pub event: ClaudeHookEvent,
 
-    /// Remove user-level Claude Code settings instead of project-level settings.
+    /// 从用户级 Claude Code settings 移除，而不是项目级 settings。
     #[arg(long)]
     pub global: bool,
 }
 
-// Claude Code integration modes that detour can install.
+// detour 可以安装的 Claude Code 集成模式。
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum ClaudeHookMode {
     #[value(name = "pre-compact")]
@@ -229,61 +229,61 @@ pub enum ClaudeHookMode {
     SkillOnly,
 }
 
-// Claude Code hook events that detour can print or uninstall.
+// detour 可以打印或卸载的 Claude Code hook 事件。
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum ClaudeHookEvent {
     #[value(name = "pre-compact")]
     PreCompact,
 }
 
-// Nested command group for skill-related actions.
+// skill 相关操作的嵌套命令组。
 #[derive(Debug, Args)]
 pub struct SkillArgs {
     #[command(subcommand)]
     pub command: SkillCommands,
 }
 
-// Commands supported under `detour skill`.
+// `detour skill` 支持的命令。
 #[derive(Debug, Subcommand)]
 pub enum SkillCommands {
-    /// Create a skill in the project .detour directory.
+    /// 在项目 .detour 目录中创建 skill。
     Create(SkillInstallArgs),
 
-    /// Install a skill into a target directory.
+    /// 把 skill 安装到目标目录。
     Install(SkillInstallArgs),
 
-    /// Print skill content to stdout.
+    /// 把 skill 内容打印到 stdout。
     Print(SkillPrintArgs),
 
-    /// Print the default skill path for a target.
+    /// 打印目标环境的默认 skill 路径。
     Path(SkillPrintArgs),
 }
 
-// Options accepted by skill commands that write files.
+// 会写文件的 skill 命令接受的参数。
 #[derive(Debug, Args)]
 pub struct SkillInstallArgs {
-    /// Skill target environment.
+    /// skill 目标环境。
     #[arg(long, value_enum)]
     pub target: SkillTarget,
 
-    /// Directory where skill files should be written.
+    /// 写入 skill 文件的目录。
     #[arg(long)]
     pub dir: Option<PathBuf>,
 
-    /// Overwrite existing generated files where supported.
+    /// 在支持的地方覆盖已有生成文件。
     #[arg(long)]
     pub force: bool,
 }
 
-// Options accepted by skill commands that only read or print information.
+// 只读取或打印信息的 skill 命令接受的参数。
 #[derive(Debug, Args)]
 pub struct SkillPrintArgs {
-    /// Skill target environment.
+    /// skill 目标环境。
     #[arg(long, value_enum)]
     pub target: SkillTarget,
 }
 
-// Assistant environments that detour can generate skills for.
+// detour 可以生成 skill 的助手环境。
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum SkillTarget {
     Codex,

@@ -1,7 +1,7 @@
 // 输入会话模型
 use serde::{Deserialize, Serialize};
 
-/// One message or tool event from an AI-assisted conversation.
+/// AI 辅助会话中的一条消息或工具事件。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConversationEvent {
     pub role: ConversationRole,
@@ -13,7 +13,7 @@ pub struct ConversationEvent {
 }
 
 impl ConversationEvent {
-    /// Create a plain conversation event with only role and content.
+    /// 创建只包含角色和内容的普通会话事件。
     pub fn new(role: ConversationRole, content: impl Into<String>) -> Self {
         Self {
             role,
@@ -24,7 +24,7 @@ impl ConversationEvent {
     }
 }
 
-/// Roles that can appear in a captured conversation.
+/// 捕获到的会话中可能出现的角色。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ConversationRole {
@@ -35,7 +35,7 @@ pub enum ConversationRole {
     Other,
 }
 
-/// Supported input formats for conversation material.
+/// 会话材料支持的输入格式。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConversationFormat {
     Json,
@@ -43,7 +43,7 @@ pub enum ConversationFormat {
     Text,
 }
 
-/// Parse conversation material into normalized events.
+/// 将会话材料解析成统一的事件列表。
 pub fn parse_conversation(
     input: &str,
     format: ConversationFormat,
@@ -55,13 +55,13 @@ pub fn parse_conversation(
     }
 }
 
-/// Parse a JSON array of conversation events.
+/// 解析 JSON 数组格式的会话事件。
 pub fn parse_json(input: &str) -> anyhow::Result<Vec<ConversationEvent>> {
     let events = serde_json::from_str(input)?;
     Ok(events)
 }
 
-/// Parse newline-delimited JSON conversation events.
+/// 解析 JSON Lines 格式的会话事件。
 pub fn parse_json_lines(input: &str) -> anyhow::Result<Vec<ConversationEvent>> {
     let mut events = Vec::new();
 
@@ -80,7 +80,7 @@ pub fn parse_json_lines(input: &str) -> anyhow::Result<Vec<ConversationEvent>> {
     Ok(events)
 }
 
-/// Wrap plain text as one conversation event.
+/// 将普通文本包装成一条会话事件。
 pub fn parse_text(input: &str) -> Vec<ConversationEvent> {
     vec![ConversationEvent::new(
         ConversationRole::Other,
