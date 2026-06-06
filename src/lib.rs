@@ -7,4 +7,5 @@ pub mod ledger;
 pub mod llm;
 pub mod models;
 pub mod render;
+pub mod skills;
 pub mod storage;

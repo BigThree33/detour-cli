@@ -6,6 +6,7 @@ use detour_cli::ledger::{
     list_documents, recent_documents, recent_rules, search_documents, show_document,
 };
 use detour_cli::llm::{capture_schema, usage_prompt};
+use detour_cli::skills::{default_skill_path, skill_content, write_skill};
 
 // 解析命令行参数，并把每个子命令分发到对应处理逻辑。
 fn main() -> Result<()> {
@@ -124,28 +125,22 @@ fn main() -> Result<()> {
         },
         Commands::Skill(args) => match args.command {
             SkillCommands::Create(command) => {
-                println!("detour skill create");
-                println!("target: {:?}", command.target);
-                if let Some(dir) = command.dir {
-                    println!("dir: {}", dir.display());
-                }
-                println!("force: {}", command.force);
+                let result = write_skill(command.target, command.dir, command.force)?;
+                println!("skill written: {}", result.path);
+                println!("target: {}", result.target);
+                println!("overwritten: {}", result.overwritten);
             }
             SkillCommands::Install(command) => {
-                println!("detour skill install");
-                println!("target: {:?}", command.target);
-                if let Some(dir) = command.dir {
-                    println!("dir: {}", dir.display());
-                }
-                println!("force: {}", command.force);
+                let result = write_skill(command.target, command.dir, command.force)?;
+                println!("skill installed: {}", result.path);
+                println!("target: {}", result.target);
+                println!("overwritten: {}", result.overwritten);
             }
             SkillCommands::Print(command) => {
-                println!("detour skill print");
-                println!("target: {:?}", command.target);
+                print!("{}", skill_content(command.target));
             }
             SkillCommands::Path(command) => {
-                println!("detour skill path");
-                println!("target: {:?}", command.target);
+                println!("{}", default_skill_path(command.target).display());
             }
         },
     }

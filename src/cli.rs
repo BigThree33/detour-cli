@@ -319,7 +319,7 @@ pub enum SkillCommands {
 #[derive(Debug, Args)]
 pub struct SkillInstallArgs {
     /// skill 目标环境。
-    #[arg(long, value_enum)]
+    #[arg(long, value_enum, default_value = "codex")]
     pub target: SkillTarget,
 
     /// 写入 skill 文件的目录。
@@ -335,7 +335,7 @@ pub struct SkillInstallArgs {
 #[derive(Debug, Args)]
 pub struct SkillPrintArgs {
     /// skill 目标环境。
-    #[arg(long, value_enum)]
+    #[arg(long, value_enum, default_value = "codex")]
     pub target: SkillTarget,
 }
 
