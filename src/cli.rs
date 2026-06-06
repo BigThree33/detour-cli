@@ -33,6 +33,12 @@ pub enum Commands {
     /// 搜索已保存的错题集文档。
     Search(SearchArgs),
 
+    /// 列出最近保存的错题集文档。
+    Recent(RecentArgs),
+
+    /// 提取最近错题集中的下次预防规则。
+    Rules(RulesArgs),
+
     /// 管理与 AI 工具的集成。
     Hook(HookArgs),
 
@@ -110,6 +116,10 @@ pub struct ShowArgs {
     /// 要显示的文档 ID 或路径。
     pub id_or_path: String,
 
+    /// 项目目录或 detour 根目录。
+    #[arg(long, default_value = ".")]
+    pub root: PathBuf,
+
     /// 打印机器可读 JSON。
     #[arg(long)]
     pub json: bool,
@@ -124,6 +134,38 @@ pub struct SearchArgs {
     /// 项目目录或 detour 根目录。
     #[arg(long, default_value = ".")]
     pub root: PathBuf,
+
+    /// 打印机器可读 JSON。
+    #[arg(long)]
+    pub json: bool,
+}
+
+// `detour recent` 接受的参数。
+#[derive(Debug, Args)]
+pub struct RecentArgs {
+    /// 项目目录或 detour 根目录。
+    #[arg(long, default_value = ".")]
+    pub root: PathBuf,
+
+    /// 最多返回多少篇文档。
+    #[arg(long, default_value_t = 5)]
+    pub limit: usize,
+
+    /// 打印机器可读 JSON。
+    #[arg(long)]
+    pub json: bool,
+}
+
+// `detour rules` 接受的参数。
+#[derive(Debug, Args)]
+pub struct RulesArgs {
+    /// 项目目录或 detour 根目录。
+    #[arg(long, default_value = ".")]
+    pub root: PathBuf,
+
+    /// 最多返回多少条规则。
+    #[arg(long, default_value_t = 20)]
+    pub limit: usize,
 
     /// 打印机器可读 JSON。
     #[arg(long)]
