@@ -4,6 +4,7 @@ pub mod capture;
 pub mod cli;
 pub mod extractor;
 pub mod ledger;
+pub mod llm;
 pub mod models;
 pub mod render;
 pub mod storage;

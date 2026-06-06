@@ -39,6 +39,12 @@ pub enum Commands {
     /// 提取最近错题集中的下次预防规则。
     Rules(RulesArgs),
 
+    /// 打印 LLM 调用 detour 时使用的输入 schema。
+    Schema,
+
+    /// 打印给 LLM 使用 detour 的操作说明。
+    Prompt(PromptArgs),
+
     /// 管理与 AI 工具的集成。
     Hook(HookArgs),
 
@@ -170,6 +176,14 @@ pub struct RulesArgs {
     /// 打印机器可读 JSON。
     #[arg(long)]
     pub json: bool,
+}
+
+// `detour prompt` 接受的参数。
+#[derive(Debug, Args)]
+pub struct PromptArgs {
+    /// prompt 目标助手环境。
+    #[arg(long, value_enum, default_value = "codex")]
+    pub target: SkillTarget,
 }
 
 // AI 工具集成相关的嵌套命令组。

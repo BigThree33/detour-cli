@@ -5,6 +5,7 @@ use detour_cli::cli::{Cli, Commands, HookCommands, SkillCommands};
 use detour_cli::ledger::{
     list_documents, recent_documents, recent_rules, search_documents, show_document,
 };
+use detour_cli::llm::{capture_schema, usage_prompt};
 
 // 解析命令行参数，并把每个子命令分发到对应处理逻辑。
 fn main() -> Result<()> {
@@ -108,6 +109,12 @@ fn main() -> Result<()> {
                     println!("- {} ({})", rule.rule, rule.title);
                 }
             }
+        }
+        Commands::Schema => {
+            println!("{}", serde_json::to_string_pretty(&capture_schema())?);
+        }
+        Commands::Prompt(args) => {
+            print!("{}", usage_prompt(args.target));
         }
         Commands::Hook(args) => match args.command {
             HookCommands::Claude(claude) => {
