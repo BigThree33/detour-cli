@@ -55,8 +55,8 @@ CLI 程序运行入口。
 - `rules`
 - `schema`
 - `prompt`
-- `hook claude` 占位
-- `skill` 占位
+- `hook claude`
+- `skill`
 
 协作注意：
 
@@ -109,6 +109,7 @@ Rust 库入口文件。
 当前导出：
 
 - `capture`
+- `claude`
 - `cli`
 - `extractor`
 - `ledger`
@@ -393,6 +394,31 @@ Markdown 渲染模块。
 - Codex 目标先写到项目内 `.detour/skills/`，避免误改全局环境。
 - 如果 detour 的调用流程变化，应同步更新 `llm.rs` 和这里生成的 skill。
 
+## Claude Code 项目级集成
+
+### `src/claude.rs`
+
+Claude Code 项目级集成模块。
+
+主要负责：
+
+- 检测当前项目是否已经安装 detour 的 Claude Code 集成文件。
+- 生成 `.claude/commands/detour-capture.md`。
+- 生成 `.claude/commands/detour-rules.md`。
+- 安装或移除项目级 slash command 文件。
+- 打印后续阶段接入 PreCompact hook 时可参考的 settings JSON 片段。
+
+当前默认写入：
+
+- `.claude/commands/detour-capture.md`
+- `.claude/commands/detour-rules.md`
+
+协作注意：
+
+- 当前阶段只写项目目录内的 `.claude/commands/`，不自动修改用户级 `~/.claude/settings.json`。
+- `PreCompact` 自动 hook 仍是后续阶段能力，当前只提供 `print-config` 和 `run-precompact` 占位。
+- 如果 Claude Code slash command 内容变化，应同步检查 `skills.rs` 和 `llm.rs` 的调用说明。
+
 ## 示例数据
 
 ### `examples/session-basic.jsonl`
@@ -489,6 +515,7 @@ cargo run -- prompt --target claude
 - 读本地错题集逻辑放在 `ledger.rs`。
 - 面向 LLM 的说明放在 `llm.rs`。
 - skill 文件生成逻辑放在 `skills.rs`。
+- Claude Code 项目级集成逻辑放在 `claude.rs`。
 - 新增功能后运行：
 
 ```bash

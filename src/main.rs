@@ -1,7 +1,13 @@
 use anyhow::Result;
 use clap::Parser;
 use detour_cli::capture::capture_from_args;
-use detour_cli::cli::{Cli, Commands, HookCommands, SkillCommands};
+use detour_cli::claude::{
+    detect_claude_project, install_claude_project, precompact_config_snippet,
+    run_precompact_placeholder, uninstall_claude_project,
+};
+use detour_cli::cli::{
+    ClaudeHookCommands, ClaudeHookEvent, Cli, Commands, HookCommands, SkillCommands,
+};
 use detour_cli::ledger::{
     list_documents, recent_documents, recent_rules, search_documents, show_document,
 };
@@ -118,10 +124,80 @@ fn main() -> Result<()> {
             print!("{}", usage_prompt(args.target));
         }
         Commands::Hook(args) => match args.command {
-            HookCommands::Claude(claude) => {
-                println!("detour hook claude");
-                println!("command: {:?}", claude.command);
-            }
+            HookCommands::Claude(claude) => match claude.command {
+                ClaudeHookCommands::Detect(command) | ClaudeHookCommands::Status(command) => {
+                    let status = detect_claude_project(std::path::Path::new("."));
+
+                    if command.json {
+                        println!("{}", serde_json::to_string_pretty(&status)?);
+                    } else {
+                        println!("Claude Code project integration");
+                        println!("project_root: {}", status.project_root);
+                        println!(
+                            "skill: {} ({})",
+                            status.skill_path,
+                            installed_label(status.skill_installed)
+                        );
+                        println!(
+                            "capture command: {} ({})",
+                            status.capture_command_path,
+                            installed_label(status.capture_command_installed)
+                        );
+                        println!(
+                            "rules command: {} ({})",
+                            status.rules_command_path,
+                            installed_label(status.rules_command_installed)
+                        );
+                    }
+                }
+                ClaudeHookCommands::Install(command) => {
+                    let result = install_claude_project(
+                        std::path::Path::new("."),
+                        command.mode,
+                        command.global,
+                        command.force,
+                    )?;
+
+                    println!("Claude Code integration installed");
+                    println!("mode: {}", result.mode);
+                    for file in result.files {
+                        println!("- {} (overwritten: {})", file.path, file.overwritten);
+                    }
+                }
+                ClaudeHookCommands::PrintConfig(command) => match command.event {
+                    ClaudeHookEvent::PreCompact => {
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&precompact_config_snippet())?
+                        );
+                    }
+                },
+                ClaudeHookCommands::Uninstall(command) => {
+                    let result = uninstall_claude_project(
+                        std::path::Path::new("."),
+                        command.mode,
+                        command.global,
+                    )?;
+
+                    println!("Claude Code integration uninstalled");
+                    println!("mode: {}", result.mode);
+                    for file in result.files {
+                        println!("- {} (removed: {})", file.path, file.removed);
+                    }
+                }
+                ClaudeHookCommands::RunPrecompact(command) => {
+                    let result = run_precompact_placeholder();
+
+                    if command.json {
+                        println!("{}", serde_json::to_string_pretty(&result)?);
+                    } else {
+                        println!(
+                            "{}",
+                            result["message"].as_str().unwrap_or("not implemented")
+                        );
+                    }
+                }
+            },
         },
         Commands::Skill(args) => match args.command {
             SkillCommands::Create(command) => {
@@ -146,4 +222,13 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+// 把布尔状态转换成终端中更容易读的安装状态。
+fn installed_label(installed: bool) -> &'static str {
+    if installed {
+        "installed"
+    } else {
+        "missing"
+    }
 }

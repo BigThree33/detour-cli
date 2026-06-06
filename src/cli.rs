@@ -241,7 +241,7 @@ pub struct JsonFlag {
 #[derive(Debug, Args)]
 pub struct ClaudeHookInstallArgs {
     /// 要安装的集成模式。
-    #[arg(long, value_enum, default_value = "pre-compact")]
+    #[arg(long, value_enum, default_value = "slash-command")]
     pub mode: ClaudeHookMode,
 
     /// 写入用户级 Claude Code settings，而不是项目级 settings。
@@ -264,9 +264,9 @@ pub struct ClaudeHookPrintConfigArgs {
 // `detour hook claude uninstall` 接受的参数。
 #[derive(Debug, Args)]
 pub struct ClaudeHookUninstallArgs {
-    /// 要移除的 hook 事件。
-    #[arg(long, value_enum, default_value = "pre-compact")]
-    pub event: ClaudeHookEvent,
+    /// 要移除的集成模式。
+    #[arg(long, value_enum, default_value = "slash-command")]
+    pub mode: ClaudeHookMode,
 
     /// 从用户级 Claude Code settings 移除，而不是项目级 settings。
     #[arg(long)]
