@@ -1,0 +1,8 @@
+{
+  "session_id": "example-session",
+  "transcript_path": "examples/claude-transcript.jsonl",
+  "cwd": ".",
+  "hook_event_name": "PreCompact",
+  "trigger": "manual",
+  "custom_instructions": "请压缩上下文前保留已经踩过的坑。"
+}

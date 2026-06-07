@@ -226,7 +226,7 @@ pub enum ClaudeHookCommands {
     Uninstall(ClaudeHookUninstallArgs),
 
     /// Claude Code PreCompact hook 调用的入口。
-    RunPrecompact(JsonFlag),
+    RunPrecompact(ClaudeRunPrecompactArgs),
 }
 
 // 简单状态类命令复用的 `--json` 参数。
@@ -271,6 +271,26 @@ pub struct ClaudeHookUninstallArgs {
     /// 从用户级 Claude Code settings 移除，而不是项目级 settings。
     #[arg(long)]
     pub global: bool,
+}
+
+// `detour hook claude run-precompact` 接受的参数。
+#[derive(Debug, Args)]
+pub struct ClaudeRunPrecompactArgs {
+    /// 最多生成多少篇文档。
+    #[arg(long, default_value_t = 5)]
+    pub max_docs: usize,
+
+    /// 写入错题集文档的目录。
+    #[arg(long, value_name = "DIR")]
+    pub out: Option<PathBuf>,
+
+    /// 只打印将要发生的操作，不写入文件。
+    #[arg(long)]
+    pub dry_run: bool,
+
+    /// 打印机器可读 JSON。
+    #[arg(long)]
+    pub json: bool,
 }
 
 // detour 可以安装的 Claude Code 集成模式。

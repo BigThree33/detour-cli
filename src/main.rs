@@ -1,9 +1,11 @@
+use std::io::Read;
+
 use anyhow::Result;
 use clap::Parser;
 use detour_cli::capture::capture_from_args;
 use detour_cli::claude::{
-    detect_claude_project, install_claude_project, precompact_config_snippet,
-    run_precompact_placeholder, uninstall_claude_project,
+    detect_claude_project, install_claude_project, precompact_config_snippet, run_precompact,
+    uninstall_claude_project,
 };
 use detour_cli::cli::{
     ClaudeHookCommands, ClaudeHookEvent, Cli, Commands, HookCommands, SkillCommands,
@@ -186,15 +188,31 @@ fn main() -> Result<()> {
                     }
                 }
                 ClaudeHookCommands::RunPrecompact(command) => {
-                    let result = run_precompact_placeholder();
+                    let mut hook_stdin = String::new();
+                    std::io::stdin().read_to_string(&mut hook_stdin)?;
+                    let result =
+                        run_precompact(&hook_stdin, command.max_docs, command.out, command.dry_run);
 
                     if command.json {
                         println!("{}", serde_json::to_string_pretty(&result)?);
                     } else {
-                        println!(
-                            "{}",
-                            result["message"].as_str().unwrap_or("not implemented")
-                        );
+                        println!("Claude Code PreCompact capture");
+                        println!("ok: {}", result.ok);
+                        println!("documents: {}", result.document_count);
+                        println!("output_dir: {}", result.output_dir);
+
+                        for saved_document in result.saved_documents {
+                            println!(
+                                "- {} ({} mistakes) -> {}",
+                                saved_document.title,
+                                saved_document.mistake_count,
+                                saved_document.path
+                            );
+                        }
+
+                        for warning in result.warnings {
+                            println!("warning: {warning}");
+                        }
                     }
                 }
             },

@@ -407,6 +407,7 @@ Claude Code 项目级集成模块。
 - 生成 `.claude/commands/detour-rules.md`。
 - 安装或移除项目级 slash command 文件。
 - 打印后续阶段接入 PreCompact hook 时可参考的 settings JSON 片段。
+- 执行 `run-precompact`，从 Claude Code hook stdin 读取 `transcript_path` 并生成错题集。
 
 当前默认写入：
 
@@ -416,7 +417,7 @@ Claude Code 项目级集成模块。
 协作注意：
 
 - 当前阶段只写项目目录内的 `.claude/commands/`，不自动修改用户级 `~/.claude/settings.json`。
-- `PreCompact` 自动 hook 仍是后续阶段能力，当前只提供 `print-config` 和 `run-precompact` 占位。
+- 当前已经实现 `run-precompact` 的 transcript 读取和错题集生成，但自动写入 `.claude/settings.json` 安装 PreCompact hook 仍是后续阶段能力。
 - 如果 Claude Code slash command 内容变化，应同步检查 `skills.rs` 和 `llm.rs` 的调用说明。
 
 ## 示例数据
@@ -434,6 +435,25 @@ Claude Code 项目级集成模块。
 
 - 新增测试场景时，可以继续放在 `examples/`。
 - 不要把真实用户隐私、密钥或业务敏感内容放进示例文件。
+
+### `examples/claude-transcript.jsonl`
+
+Claude Code PreCompact 阶段验收用的模拟 transcript。
+
+主要负责：
+
+- 模拟 Claude Code transcript JSONL。
+- 覆盖 shell 环境问题和 Claude Code hook 集成问题。
+- 配合 `examples/claude-precompact-input.json` 测试 `run-precompact`。
+
+### `examples/claude-precompact-input.json`
+
+Claude Code PreCompact hook stdin 的模拟输入。
+
+主要负责：
+
+- 提供 `session_id`、`transcript_path`、`cwd`、`hook_event_name`、`trigger` 等字段。
+- 让本地可以直接验收 `detour hook claude run-precompact`。
 
 ## 生成内容目录
 

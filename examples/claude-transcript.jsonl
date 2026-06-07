@@ -1,0 +1,4 @@
+{"type":"user","message":{"role":"user","content":"为什么在 VS Code 里 cargo is not recognized，但是我在桌面 cmd 能运行 cargo --version？"},"timestamp":"2026-06-07T10:00:00Z"}
+{"type":"assistant","message":{"role":"assistant","content":"这是 PATH 刷新问题：Rust 安装后，新开的 cmd 能识别 cargo，但 VS Code 旧终端继承的是旧环境变量，所以会 failed。修复方式是重启 VS Code 或重新打开终端。"},"timestamp":"2026-06-07T10:01:00Z"}
+{"type":"user","message":{"role":"user","content":"接入 Claude Code PreCompact hook 时，不要默认改全局 settings。"},"timestamp":"2026-06-07T10:02:00Z"}
+{"type":"assistant","message":{"role":"assistant","content":"正确做法是先写项目级 .claude/settings.json，并在 install 前备份；如果 hook 失败，也不能阻塞 Claude Code 压缩。"},"timestamp":"2026-06-07T10:03:00Z"}
