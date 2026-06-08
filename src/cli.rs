@@ -332,6 +332,7 @@ pub enum ClaudeHookMode {
     #[value(name = "slash-command")]
     SlashCommand,
     Wrapper,
+    Reminder,
     #[value(name = "skill-only")]
     SkillOnly,
 }

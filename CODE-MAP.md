@@ -437,6 +437,7 @@ Claude Code 项目级集成模块。
 - 生成 `.claude/commands/detour-rules.md`。
 - 安装或移除项目级 slash command 文件。
 - 安装或移除项目级 `.claude/settings.json` 中的 PreCompact hook。
+- 安装或移除项目级 `.claude/CLAUDE.md` 中的 detour reminder。
 - 打印 PreCompact hook 的 settings JSON 片段。
 - 执行 `run-precompact`，从 Claude Code hook stdin 读取 `transcript_path` 并生成错题集。
 - 通过 `hookSpecificOutput.additionalContext` 向 Claude Code 注入 PreCompact 后续提示。
@@ -447,12 +448,16 @@ Claude Code 项目级集成模块。
 - `.claude/commands/detour-rules.md`
 - `.claude/settings.json`
 - `.claude/settings.detour-backup*.json`
+- `.claude/CLAUDE.md`
+- `.claude/CLAUDE.detour-backup*.md`
 
 协作注意：
 
 - 当前只写项目目录内的 `.claude/`，不自动修改用户级 `~/.claude/settings.json`。
 - 安装 PreCompact hook 前会备份已有 `.claude/settings.json`。
 - 卸载 PreCompact hook 时只移除 detour 自己写入的 command，不移除用户已有 hook。
+- 安装 reminder 前会备份已有 `.claude/CLAUDE.md`。
+- reminder 使用 HTML 注释标记块，卸载时只移除 detour 自己写入的块。
 - PreCompact 输出 JSON 中包含给 Claude Code 的 additionalContext，用于告诉模型已经保存了哪些 notes、tags 和路径。
 - 如果 Claude Code slash command 内容变化，应同步检查 `skills.rs` 和 `llm.rs` 的调用说明。
 

@@ -173,6 +173,11 @@ fn main() -> Result<()> {
                             installed_label(status.precompact_installed)
                         );
                         println!(
+                            "reminder: {} ({})",
+                            status.reminder_path,
+                            installed_label(status.reminder_installed)
+                        );
+                        println!(
                             "skill: {} ({})",
                             status.skill_path,
                             installed_label(status.skill_installed)

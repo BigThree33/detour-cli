@@ -13,6 +13,8 @@ use crate::storage::{write_documents, SavedDocument, StoredDocumentFormat};
 
 const PRECOMPACT_COMMAND: &str = "detour hook claude run-precompact --max-docs 5 --json";
 const PRECOMPACT_MATCHERS: [&str; 2] = ["manual", "auto"];
+const REMINDER_MARKER_START: &str = "<!-- detour-cli:reminder:start -->";
+const REMINDER_MARKER_END: &str = "<!-- detour-cli:reminder:end -->";
 
 /// Claude Code 项目级集成状态。
 #[derive(Debug, Clone, Serialize)]
@@ -20,6 +22,8 @@ pub struct ClaudeStatus {
     pub project_root: String,
     pub settings_path: String,
     pub precompact_installed: bool,
+    pub reminder_path: String,
+    pub reminder_installed: bool,
     pub skill_path: String,
     pub skill_installed: bool,
     pub capture_command_path: String,
@@ -106,6 +110,7 @@ struct ClaudeHookInput {
 /// 检测当前项目中的 Claude Code detour 集成状态。
 pub fn detect_claude_project(project_root: &Path) -> ClaudeStatus {
     let settings_path = settings_path(project_root);
+    let reminder_path = reminder_path(project_root);
     let skill_path = project_root.join(default_skill_path(crate::cli::SkillTarget::Claude));
     let capture_command_path = capture_command_path(project_root);
     let rules_command_path = rules_command_path(project_root);
@@ -114,6 +119,8 @@ pub fn detect_claude_project(project_root: &Path) -> ClaudeStatus {
         project_root: project_root.display().to_string(),
         precompact_installed: precompact_hook_installed(&settings_path),
         settings_path: settings_path.display().to_string(),
+        reminder_installed: reminder_installed(&reminder_path),
+        reminder_path: reminder_path.display().to_string(),
         skill_installed: skill_path.exists(),
         skill_path: skill_path.display().to_string(),
         capture_command_installed: capture_command_path.exists(),
@@ -138,6 +145,7 @@ pub fn install_claude_project(
         ClaudeHookMode::SlashCommand => install_slash_commands(project_root, force),
         ClaudeHookMode::SkillOnly => install_skill(project_root, force),
         ClaudeHookMode::PreCompact => install_precompact_hook(project_root),
+        ClaudeHookMode::Reminder => install_reminder(project_root),
         ClaudeHookMode::Wrapper => {
             bail!("wrapper install is not implemented yet")
         }
@@ -158,6 +166,7 @@ pub fn uninstall_claude_project(
         ClaudeHookMode::SlashCommand => uninstall_slash_commands(project_root),
         ClaudeHookMode::SkillOnly => uninstall_skill(project_root),
         ClaudeHookMode::PreCompact => uninstall_precompact_hook(project_root),
+        ClaudeHookMode::Reminder => uninstall_reminder(project_root),
         ClaudeHookMode::Wrapper => {
             bail!("wrapper uninstall is not implemented yet")
         }
@@ -898,6 +907,168 @@ fn precompact_hook_entry(matcher: &str) -> Value {
     })
 }
 
+/// 安装 Claude Code 项目 memory 提醒。
+fn install_reminder(project_root: &Path) -> anyhow::Result<ClaudeInstallResult> {
+    let path = reminder_path(project_root);
+    let overwritten = path.exists();
+    let existing = if overwritten {
+        fs::read_to_string(&path)
+            .with_context(|| format!("failed to read Claude Code reminder {}", path.display()))?
+    } else {
+        String::new()
+    };
+    let next = upsert_reminder_block(&existing);
+    let mut files = Vec::new();
+
+    if next != existing {
+        if overwritten {
+            let backup_path = backup_markdown_file(&path)?;
+            files.push(ClaudeWrittenFile {
+                path: display_path(backup_path),
+                overwritten: false,
+            });
+        }
+
+        write_file(path.clone(), next, true)?;
+    }
+
+    files.push(ClaudeWrittenFile {
+        path: display_path(path),
+        overwritten,
+    });
+
+    Ok(ClaudeInstallResult {
+        mode: "reminder".to_string(),
+        files,
+    })
+}
+
+/// 移除 Claude Code 项目 memory 中的 detour 提醒。
+fn uninstall_reminder(project_root: &Path) -> anyhow::Result<ClaudeUninstallResult> {
+    let path = reminder_path(project_root);
+
+    if !path.exists() {
+        return Ok(ClaudeUninstallResult {
+            mode: "reminder".to_string(),
+            files: vec![ClaudeRemovedFile {
+                path: display_path(path),
+                removed: false,
+            }],
+        });
+    }
+
+    let existing = fs::read_to_string(&path)
+        .with_context(|| format!("failed to read Claude Code reminder {}", path.display()))?;
+    let next = remove_reminder_block(&existing);
+    let changed = next != existing;
+
+    if changed {
+        fs::write(&path, next)
+            .with_context(|| format!("failed to write Claude Code reminder {}", path.display()))?;
+    }
+
+    Ok(ClaudeUninstallResult {
+        mode: "reminder".to_string(),
+        files: vec![ClaudeRemovedFile {
+            path: display_path(path),
+            removed: changed,
+        }],
+    })
+}
+
+/// 检查 Claude Code 项目 memory 是否已经安装 detour 提醒。
+fn reminder_installed(path: &Path) -> bool {
+    fs::read_to_string(path)
+        .map(|content| {
+            content.contains(REMINDER_MARKER_START) && content.contains(REMINDER_MARKER_END)
+        })
+        .unwrap_or(false)
+}
+
+/// 插入或替换 detour 提醒块。
+fn upsert_reminder_block(existing: &str) -> String {
+    let without_old = remove_reminder_block(existing);
+    let mut next = without_old.trim_end().to_string();
+
+    if !next.is_empty() {
+        next.push_str("\n\n");
+    }
+
+    next.push_str(&reminder_block());
+    next.push('\n');
+    next
+}
+
+/// 移除 detour 提醒块。
+fn remove_reminder_block(existing: &str) -> String {
+    let Some(start) = existing.find(REMINDER_MARKER_START) else {
+        return existing.to_string();
+    };
+    let Some(end_relative) = existing[start..].find(REMINDER_MARKER_END) else {
+        return existing.to_string();
+    };
+    let end = start + end_relative + REMINDER_MARKER_END.len();
+    let mut next = String::new();
+    next.push_str(existing[..start].trim_end());
+
+    if !next.is_empty() {
+        next.push_str("\n\n");
+    }
+
+    next.push_str(existing[end..].trim_start());
+    next
+}
+
+/// 返回写入 Claude Code 项目 memory 的 detour 提醒块。
+fn reminder_block() -> String {
+    format!(
+        r#"{REMINDER_MARKER_START}
+## Detour Context-Compression Reminder
+
+When this project is being worked on with Claude Code, preserve mistake notes before context compaction.
+
+Run `/detour-capture` before `/compact`, before summarizing or switching tasks, and whenever the session has accumulated failed commands, wrong assumptions, environment constraints, permission issues, path issues, API misunderstandings, or user preference corrections.
+
+`/detour-capture` is the LLM-generated path: Claude must analyze the current conversation, generate structured mistake-notebook JSON, and call `detour save --stdin --json` so detour can render Markdown notes into `.detour/mistakes/`.
+
+Use `detour rules --limit 20 --json` or `/detour-rules` before similar future work, and honor tags/frontmatter in the saved Markdown notes.
+{REMINDER_MARKER_END}"#
+    )
+}
+
+/// 写入前备份已有 Markdown memory 文件。
+fn backup_markdown_file(path: &Path) -> anyhow::Result<PathBuf> {
+    let backup_path = unique_markdown_backup_path(path);
+    fs::copy(path, &backup_path).with_context(|| {
+        format!(
+            "failed to back up Claude Code reminder from {} to {}",
+            path.display(),
+            backup_path.display()
+        )
+    })?;
+    Ok(backup_path)
+}
+
+/// 生成不覆盖旧备份的 Markdown memory 备份路径。
+fn unique_markdown_backup_path(path: &Path) -> PathBuf {
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let first = parent.join("CLAUDE.detour-backup.md");
+
+    if !first.exists() {
+        return first;
+    }
+
+    for index in 2.. {
+        let candidate = parent.join(format!("CLAUDE.detour-backup-{index}.md"));
+
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+
+    unreachable!("backup path loop should always return");
+}
+
 /// 安装 Claude Code slash command 文件。
 fn install_slash_commands(project_root: &Path, force: bool) -> anyhow::Result<ClaudeInstallResult> {
     let files = vec![
@@ -1002,6 +1173,11 @@ fn remove_file(path: PathBuf) -> anyhow::Result<ClaudeRemovedFile> {
 /// 返回 Claude Code 项目级 settings 路径。
 fn settings_path(project_root: &Path) -> PathBuf {
     project_root.join(".claude").join("settings.json")
+}
+
+/// 返回 Claude Code 项目 memory 路径。
+fn reminder_path(project_root: &Path) -> PathBuf {
+    project_root.join(".claude").join("CLAUDE.md")
 }
 
 /// 返回 capture slash command 的路径。
@@ -1278,6 +1454,26 @@ mod tests {
         assert!(result.files[0].removed);
         assert!(!settings_text.contains(PRECOMPACT_COMMAND));
         assert!(settings_text.contains("echo keep-me"));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn installs_and_uninstalls_reminder() {
+        let root = unique_temp_dir("detour-reminder-test");
+        let result = install_claude_project(&root, ClaudeHookMode::Reminder, false, false).unwrap();
+        let status = detect_claude_project(&root);
+
+        assert_eq!(result.mode, "reminder");
+        assert!(reminder_path(&root).exists());
+        assert!(status.reminder_installed);
+
+        let result = uninstall_claude_project(&root, ClaudeHookMode::Reminder, false).unwrap();
+        let status = detect_claude_project(&root);
+
+        assert_eq!(result.mode, "reminder");
+        assert!(result.files[0].removed);
+        assert!(!status.reminder_installed);
 
         let _ = fs::remove_dir_all(root);
     }
