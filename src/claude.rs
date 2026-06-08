@@ -61,6 +61,8 @@ pub struct ClaudeRemovedFile {
 pub struct ClaudePreCompactResult {
     pub ok: bool,
     pub implemented: bool,
+    #[serde(rename = "continue")]
+    pub continue_execution: bool,
     pub hook_event_name: Option<String>,
     pub trigger: Option<String>,
     pub session_id: Option<String>,
@@ -71,6 +73,17 @@ pub struct ClaudePreCompactResult {
     pub document_count: usize,
     pub saved_documents: Vec<SavedDocument>,
     pub warnings: Vec<String>,
+    #[serde(rename = "hookSpecificOutput", skip_serializing_if = "Option::is_none")]
+    pub hook_specific_output: Option<ClaudeHookSpecificOutput>,
+}
+
+/// 注入给 Claude Code 的 hook 专用输出。
+#[derive(Debug, Clone, Serialize)]
+pub struct ClaudeHookSpecificOutput {
+    #[serde(rename = "hookEventName")]
+    pub hook_event_name: String,
+    #[serde(rename = "additionalContext")]
+    pub additional_context: String,
 }
 
 /// Claude Code hook 通过 stdin 传入的关键字段。
@@ -312,20 +325,31 @@ pub fn run_precompact(
     } else {
         saved_documents.len()
     };
+    let output_dir_display = display_path(&output_dir);
+    let hook_specific_output = Some(precompact_hook_specific_output(precompact_prompt(
+        true,
+        document_count,
+        &saved_documents,
+        &output_dir_display,
+        &warnings,
+        dry_run,
+    )));
 
     ClaudePreCompactResult {
         ok: true,
         implemented: true,
+        continue_execution: true,
         hook_event_name: hook_input.hook_event_name,
         trigger: hook_input.trigger,
         session_id: hook_input.session_id,
         transcript_path: Some(display_path(transcript_path)),
         cwd: Some(display_path(&cwd)),
         source: "transcript".to_string(),
-        output_dir: display_path(output_dir),
+        output_dir: output_dir_display,
         document_count,
         saved_documents,
         warnings,
+        hook_specific_output,
     }
 }
 
@@ -343,9 +367,19 @@ fn precompact_result(
     saved_documents: Vec<SavedDocument>,
     warnings: Vec<String>,
 ) -> ClaudePreCompactResult {
+    let hook_specific_output = Some(precompact_hook_specific_output(precompact_prompt(
+        ok,
+        saved_documents.len(),
+        &saved_documents,
+        &output_dir,
+        &warnings,
+        false,
+    )));
+
     ClaudePreCompactResult {
         ok,
         implemented: true,
+        continue_execution: true,
         hook_event_name,
         trigger,
         session_id,
@@ -354,9 +388,66 @@ fn precompact_result(
         source,
         output_dir,
         document_count: saved_documents.len(),
+        hook_specific_output,
         saved_documents,
         warnings,
     }
+}
+
+/// 生成 Claude Code hook 专用输出，向上下文注入 detour 提示。
+fn precompact_hook_specific_output(additional_context: String) -> ClaudeHookSpecificOutput {
+    ClaudeHookSpecificOutput {
+        hook_event_name: "PreCompact".to_string(),
+        additional_context,
+    }
+}
+
+/// 生成注入给 Claude Code 的 PreCompact 提示。
+fn precompact_prompt(
+    ok: bool,
+    document_count: usize,
+    saved_documents: &[SavedDocument],
+    output_dir: &str,
+    warnings: &[String],
+    dry_run: bool,
+) -> String {
+    let mut lines = Vec::new();
+
+    lines.push("Detour PreCompact capture has run before context compaction.".to_string());
+
+    if ok {
+        if dry_run {
+            lines.push(format!(
+                "Detour dry-run found {document_count} mistake-note document(s); no files were written."
+            ));
+        } else {
+            lines.push(format!(
+                "Detour saved {document_count} mistake-note document(s) under {output_dir}."
+            ));
+        }
+    } else {
+        lines.push("Detour could not save mistake notes automatically. Preserve the important mistakes, fixes, and prevention rules in the compacted context manually.".to_string());
+    }
+
+    for document in saved_documents {
+        let tags = if document.tags.is_empty() {
+            "untagged".to_string()
+        } else {
+            document.tags.join(", ")
+        };
+        lines.push(format!(
+            "- {} [{}] -> {}",
+            document.title, tags, document.path
+        ));
+    }
+
+    if !warnings.is_empty() {
+        lines.push(format!("Warnings: {}", warnings.join(" | ")));
+    }
+
+    lines.push("When continuing after compaction, use these notes as durable memory. Before repeating related work, run `detour rules --limit 20 --json` or `detour search <topic> --json`, and honor the tags/frontmatter in the Markdown notes.".to_string());
+
+    lines.join("\n")
 }
 
 /// 解析 Claude Code transcript JSONL，无法结构化解析时回退成普通文本事件。
@@ -933,31 +1024,93 @@ fn rules_command_path(project_root: &Path) -> PathBuf {
 fn claude_capture_command_content() -> String {
     r#"# detour-capture
 
-请复盘当前 Claude Code 会话中已经踩过的坑，并调用 detour 保存错题集。
+请你作为 Claude Code 的 LLM，复盘当前会话中已经踩过的坑，并亲自生成错题集 JSON，然后调用 detour 保存成 Markdown 文档。
 
 你必须：
 
 1. 找出本会话中已经出现的错误假设、命令失败、环境约束、权限问题、路径问题、API 误解或用户偏好遗漏。
 2. 不要编造不存在的错误或证据。
-3. 优先保留错误现象、错误路径、根因、修正方式和下次预防规则。
-4. 使用 shell 运行：
+3. 由你来分析错误现象、错误路径、根因、修正方式和下次预防规则。
+4. 按下面 JSON schema 生成最多 5 篇文档。
+5. 把 JSON 通过 stdin 传给 detour 保存。
+
+JSON 顶层必须是：
+
+```json
+{
+  "documents": []
+}
+```
+
+每篇 document 必须包含：
+
+```json
+{
+  "title": "Claude Code Hook 错题集",
+  "summary": "本文件记录 Claude Code hook 集成时踩过的坑。",
+  "tags": ["claude-code", "precompact"],
+  "mistakes": []
+}
+```
+
+每条 mistake 必须包含：
+
+```json
+{
+  "title": "不要把 hook 命令误认为 LLM 推理",
+  "symptom": "误以为 detour extractor 会把规则发给 Claude Code。",
+  "wrong_turn": "混淆了 Claude Code shell hook 和 Claude LLM 生成流程。",
+  "root_cause": "没有拆开 Claude Code 宿主、hook 外部命令和 LLM 推理的职责。",
+  "correction": "由 Claude 先生成结构化错题 JSON，再交给 detour save 保存。",
+  "prevention_rule": "需要模型生成内容时，先让模型生成 JSON，再让 CLI 负责校验、渲染和存储。",
+  "tags": ["llm-interface", "claude-code"],
+  "severity": "high",
+  "evidence": [
+    {
+      "kind": "message",
+      "value": "用户明确要求让大模型生成错题集，而不是 Rust 规则生成。"
+    }
+  ]
+}
+```
+
+severity 只能是：
+
+```text
+low
+medium
+high
+```
+
+evidence.kind 只能是：
+
+```text
+command
+file
+output
+message
+other
+```
+
+优先使用：
 
 ```bash
-detour capture --stdin --json
+detour save --stdin --json
 ```
 
 如果 `detour` 不在 PATH 中，且当前目录是 detour 源码项目，则改用：
 
 ```bash
-cargo run -- capture --stdin --json
+cargo run -- save --stdin --json
 ```
 
-stdin 输入应使用 JSON 数组或 JSONL，至少包含关键 user、assistant、tool 消息。
+stdin 输入必须是你生成的错题集 JSON，不是原始 transcript。
 
 保存成功后，请告诉用户：
 
 - 生成了几篇错题集。
 - 每篇错题集的路径。
+- 每篇错题集的 tags。
 - 最重要的下次预防规则。
 "#
     .to_string()
@@ -1155,6 +1308,13 @@ mod tests {
         assert!(result.implemented);
         assert_eq!(result.document_count, 1);
         assert_eq!(result.saved_documents.len(), 1);
+        assert_eq!(result.saved_documents[0].tags, vec!["rust-cli"]);
+        assert!(result
+            .hook_specific_output
+            .as_ref()
+            .unwrap()
+            .additional_context
+            .contains("detour rules --limit 20 --json"));
         assert!(Path::new(&result.saved_documents[0].path).exists());
 
         let _ = fs::remove_dir_all(root);

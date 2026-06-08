@@ -39,6 +39,7 @@ pub struct SavedDocument {
     pub title: String,
     pub path: String,
     pub mistake_count: usize,
+    pub tags: Vec<String>,
 }
 
 /// 将错题集文档写入指定目录，并返回保存结果。
@@ -63,6 +64,7 @@ pub fn write_documents(
             title: document.title.clone(),
             path: path.display().to_string(),
             mistake_count: document.mistakes.len(),
+            tags: document.tags.clone(),
         });
     }
 

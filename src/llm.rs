@@ -68,6 +68,8 @@ pub fn usage_prompt(target: SkillTarget) -> String {
 
 你可以使用本地 CLI `detour` 把当前 AI 会话中踩过的坑保存成错题集。
 
+重要：如果你是 {target_name} 的 LLM，请由你先分析会话并生成错题集 JSON，再调用 `detour save` 保存。`detour capture` 是没有 LLM 参与的本地规则兜底。
+
 ## 什么时候使用
 
 - 上下文即将压缩、总结或切换之前。
@@ -75,38 +77,50 @@ pub fn usage_prompt(target: SkillTarget) -> String {
 - 发现了环境、shell、权限、依赖、API、hook、模型调用契约等约束。
 - 用户要求保存经验、复盘问题或避免下次重复踩坑。
 
-## 如何保存错题集
+## 首选：由 LLM 生成错题集，再保存
 
 优先运行：
 
 ```bash
-detour capture --stdin --json
+detour save --stdin --json
 ```
 
 如果当前还在 detour 项目源码中开发，也可以运行：
 
 ```bash
-cargo run -- capture --stdin --json
+cargo run -- save --stdin --json
 ```
 
-stdin 输入应是 JSON 数组或 JSONL。推荐 JSON 数组：
+stdin 输入必须是你生成的错题集 JSON：
 
 ```json
-[
-  {{
-    "role": "user",
-    "content": "用户提出的问题或关键约束"
-  }},
-  {{
-    "role": "assistant",
-    "content": "模型做出的错误判断、修复尝试或关键解释"
-  }},
-  {{
-    "role": "tool",
-    "content": "命令输出、报错、测试结果或文件证据",
-    "source": "terminal"
-  }}
-]
+{{
+  "documents": [
+    {{
+      "title": "Claude Code Hook 错题集",
+      "summary": "本文件记录 Claude Code hook 集成时踩过的坑。",
+      "tags": ["claude-code", "precompact"],
+      "mistakes": [
+        {{
+          "title": "不要把 hook 命令误认为 LLM 推理",
+          "symptom": "误以为 hook 外部命令会自动调用 Claude 生成内容。",
+          "wrong_turn": "混淆了 Claude Code hook 和 Claude LLM 生成流程。",
+          "root_cause": "没有拆开宿主生命周期、外部 CLI 和 LLM 生成职责。",
+          "correction": "由 LLM 先生成结构化错题 JSON，再调用 detour save 保存。",
+          "prevention_rule": "需要模型生成内容时，先让模型生成 JSON，再让 CLI 负责校验和持久化。",
+          "tags": ["llm-interface", "claude-code"],
+          "severity": "high",
+          "evidence": [
+            {{
+              "kind": "message",
+              "value": "用户明确要求让大模型生成错题集。"
+            }}
+          ]
+        }}
+      ]
+    }}
+  ]
+}}
 ```
 
 ## 输入质量要求
@@ -114,7 +128,18 @@ stdin 输入应是 JSON 数组或 JSONL。推荐 JSON 数组：
 - 不要编造不存在的错误或证据。
 - 优先保留错误现象、错误假设、根因、修正方式、下次预防规则相关内容。
 - 工具输出、命令报错、文件路径、用户偏好和项目约束都应尽量保留。
-- 会话很长时，只传最关键的片段；detour 会用本地规则生成错题集。
+- 会话很长时，优先由你先压缩成高质量错题集 JSON，再交给 detour 保存。
+- document 和 mistake 都必须带 tags；detour 会把 tags 写入 Markdown frontmatter。
+
+## 兜底：本地规则生成
+
+如果你无法生成结构化错题集 JSON，才使用：
+
+```bash
+detour capture --stdin --json
+```
+
+这条命令会用 detour 本地规则分析输入，质量低于 LLM 生成。
 
 ## 保存后如何读取
 
@@ -138,13 +163,13 @@ detour rules --limit 20 --json
 
 ## 输出处理
 
-如果 `detour capture --stdin --json` 返回 `ok: true`，请向用户报告保存路径。
+如果 `detour save --stdin --json` 返回 `ok: true`，请向用户报告保存路径。
 
 如果命令失败：
 
 1. 检查 `detour` 是否在 PATH 中。
-2. 如果当前在源码项目里，改用 `cargo run -- capture --stdin --json`。
-3. 检查 stdin 是否是合法 JSON 数组或 JSONL。
+2. 如果当前在源码项目里，改用 `cargo run -- save --stdin --json`。
+3. 检查 stdin 是否是合法错题集 JSON。
 4. 最多重试一次，不要反复执行同一个失败命令。
 "#
     )

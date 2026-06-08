@@ -1,0 +1,27 @@
+{
+  "documents": [
+    {
+      "title": "Claude Code LLM 生成错题集",
+      "summary": "本文件模拟 Claude Code LLM 在压缩前生成的踩坑复盘。",
+      "tags": ["claude-code", "llm-interface", "precompact"],
+      "mistakes": [
+        {
+          "title": "不要把 PreCompact hook 外部命令误认为 LLM 推理",
+          "symptom": "误以为 detour extractor 会把规则发给 Claude Code，并由 Claude 返回结果。",
+          "wrong_turn": "混淆了 Claude Code 生命周期 hook、外部 CLI 和 Claude LLM 生成流程。",
+          "root_cause": "没有明确拆分 LLM 负责生成内容，detour 负责保存和检索。",
+          "correction": "让 Claude Code LLM 先生成结构化错题集 JSON，再调用 detour save 持久化。",
+          "prevention_rule": "需要模型生成内容时，先让模型生成 JSON，再让 CLI 负责校验、渲染和存储。",
+          "tags": ["claude-code", "llm-interface"],
+          "severity": "high",
+          "evidence": [
+            {
+              "kind": "message",
+              "value": "用户明确要求在大模型压缩上下文之前，由大模型生成错题集。"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

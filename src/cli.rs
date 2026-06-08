@@ -24,6 +24,9 @@ pub enum Commands {
     /// 捕获会话并生成错题集文档。
     Capture(CaptureArgs),
 
+    /// 保存 LLM 已经生成好的错题集文档。
+    Save(SaveArgs),
+
     /// 列出已保存的错题集文档。
     List(ListArgs),
 
@@ -80,6 +83,34 @@ pub struct CaptureArgs {
     pub out: Option<PathBuf>,
 
     /// 最多生成多少篇文档。
+    #[arg(long, default_value_t = 5)]
+    pub max_docs: usize,
+
+    /// 输出文档格式。
+    #[arg(long, value_enum, default_value = "md")]
+    pub format: CaptureFormat,
+
+    /// 只打印将要发生的操作，不写入文件。
+    #[arg(long)]
+    pub dry_run: bool,
+
+    /// 用机器可读 JSON 打印命令结果。
+    #[arg(long)]
+    pub json: bool,
+}
+
+// `detour save` 接受的参数。
+#[derive(Debug, Args)]
+pub struct SaveArgs {
+    /// 从标准输入读取 LLM 生成的错题集 JSON。
+    #[arg(long)]
+    pub stdin: bool,
+
+    /// 写入错题集文档的目录。
+    #[arg(long, value_name = "DIR")]
+    pub out: Option<PathBuf>,
+
+    /// 最多保存多少篇文档。
     #[arg(long, default_value_t = 5)]
     pub max_docs: usize,
 

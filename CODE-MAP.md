@@ -48,6 +48,7 @@ CLI 程序运行入口。
 当前已接入：
 
 - `capture`
+- `save`
 - `list`
 - `show`
 - `search`
@@ -116,6 +117,7 @@ Rust 库入口文件。
 - `llm`
 - `models`
 - `render`
+- `save`
 - `skills`
 - `storage`
 
@@ -220,7 +222,7 @@ Rust 库入口文件。
 
 ### `src/extractor.rs`
 
-本地规则版错题提取器。
+本地规则版错题提取器，当前定位是兜底方案。
 
 主要负责：
 
@@ -250,10 +252,33 @@ Rust 库入口文件。
 
 协作注意：
 
+- 这不是最终主生成器；主路线应由 Claude Code / 其他 LLM 生成错题集 JSON，再交给 `save.rs` 保存。
 - 如果要改“什么算踩坑”，改关键词和 `looks_like_mistake_candidate`。
 - 如果要改分类，改 `classify_tag`。
 - 如果要改错题内容模板，改 `root_cause_for`、`correction_for`、`prevention_rule_for`。
 - 未来接 LLM 生成器时，可以保留这里作为离线兜底。
+
+### `src/save.rs`
+
+LLM 生成错题集后的保存入口。
+
+主要负责：
+
+- 接收 Claude Code / 其他 LLM 已经生成好的错题集 JSON。
+- 支持 `{ "documents": [...] }` 或直接文档数组。
+- 校验并补齐文档 id、created_at、tags 等 metadata。
+- 调用 `storage.rs` 写入 Markdown 或 JSON。
+- 返回 `SavedDocument`，其中包含保存路径、错题数量和 tags。
+
+核心函数：
+
+- `save_from_args`
+
+协作注意：
+
+- 这是当前符合产品目标的主路径：LLM 负责分析和生成，detour 负责校验、渲染、存储、检索。
+- Claude Code 的 `/detour-capture` 应调用 `detour save --stdin --json`，而不是把 transcript 交给规则版 `capture`。
+- `capture.rs` / `extractor.rs` 保留为自动 hook 或无 LLM 环境下的兜底。
 
 ## 渲染与存储
 
@@ -268,6 +293,9 @@ Markdown 渲染模块。
 
 当前 Markdown 结构：
 
+- YAML frontmatter
+- 文档级 metadata
+- tags
 - 标题
 - 生成时间
 - 标签
@@ -284,6 +312,7 @@ Markdown 渲染模块。
 协作注意：
 
 - 想调整 Markdown 文档样式，改这里。
+- Markdown 文件自身的 metadata 和 tags frontmatter 在这里生成。
 - 不要在这里处理文件写入。
 - 不要在这里处理提取逻辑。
 
@@ -308,6 +337,7 @@ Markdown 渲染模块。
 
 - 默认写入路径由 `capture.rs` 决定。
 - 文件命名和防覆盖逻辑在这里。
+- `SavedDocument` 会保留文档 tags，供 hook 注入 prompt 和 JSON 输出使用。
 - 不要在这里解析 Markdown 或搜索文档。
 
 ## 本地存折读取
@@ -409,6 +439,7 @@ Claude Code 项目级集成模块。
 - 安装或移除项目级 `.claude/settings.json` 中的 PreCompact hook。
 - 打印 PreCompact hook 的 settings JSON 片段。
 - 执行 `run-precompact`，从 Claude Code hook stdin 读取 `transcript_path` 并生成错题集。
+- 通过 `hookSpecificOutput.additionalContext` 向 Claude Code 注入 PreCompact 后续提示。
 
 当前默认写入：
 
@@ -422,6 +453,7 @@ Claude Code 项目级集成模块。
 - 当前只写项目目录内的 `.claude/`，不自动修改用户级 `~/.claude/settings.json`。
 - 安装 PreCompact hook 前会备份已有 `.claude/settings.json`。
 - 卸载 PreCompact hook 时只移除 detour 自己写入的 command，不移除用户已有 hook。
+- PreCompact 输出 JSON 中包含给 Claude Code 的 additionalContext，用于告诉模型已经保存了哪些 notes、tags 和路径。
 - 如果 Claude Code slash command 内容变化，应同步检查 `skills.rs` 和 `llm.rs` 的调用说明。
 
 ## 示例数据
@@ -481,6 +513,12 @@ Claude Code PreCompact hook stdin 的模拟输入。
 
 ```bash
 cargo run -- capture --from examples/session-basic.jsonl --max-docs 2
+```
+
+### 保存 LLM 生成结果
+
+```bash
+type examples\llm-mistakes.json | cargo run -- save --stdin --json
 ```
 
 ### 列出

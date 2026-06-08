@@ -14,6 +14,7 @@ use detour_cli::ledger::{
     list_documents, recent_documents, recent_rules, search_documents, show_document,
 };
 use detour_cli::llm::{capture_schema, usage_prompt};
+use detour_cli::save::save_from_args;
 use detour_cli::skills::{default_skill_path, skill_content, write_skill};
 
 // 解析命令行参数，并把每个子命令分发到对应处理逻辑。
@@ -34,6 +35,37 @@ fn main() -> Result<()> {
                 println!("{}", serde_json::to_string_pretty(&result)?);
             } else {
                 println!("detour capture");
+                println!("source: {}", result.source);
+                println!("dry_run: {}", result.dry_run);
+                println!("output_dir: {}", result.output_dir);
+                println!("documents: {}", result.document_count);
+
+                if result.dry_run {
+                    for document in result.documents {
+                        println!(
+                            "- {} ({} mistakes, not written)",
+                            document.title,
+                            document.mistakes.len()
+                        );
+                    }
+                } else {
+                    for saved_document in result.saved_documents {
+                        println!(
+                            "- {} ({} mistakes) -> {}",
+                            saved_document.title, saved_document.mistake_count, saved_document.path
+                        );
+                    }
+                }
+            }
+        }
+        Commands::Save(args) => {
+            let json = args.json;
+            let result = save_from_args(args)?;
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&result)?);
+            } else {
+                println!("detour save");
                 println!("source: {}", result.source);
                 println!("dry_run: {}", result.dry_run);
                 println!("output_dir: {}", result.output_dir);
