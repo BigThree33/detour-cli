@@ -107,7 +107,7 @@ detour search <keyword> --json
 
 ## 自定义错题分类
 
-项目可以定义自己的分类配置。
+项目可以定义自己的分类配置。默认情况下，这个配置是空白的注释模板；没有配置时，Claude/detour 使用内置兜底分类。
 
 把本仓库的模板复制到目标项目：
 
@@ -121,7 +121,33 @@ detour search <keyword> --json
 config.yoml
 ```
 
-示例分类：
+内置兜底分类：
+
+```text
+claude-code
+rust-cli
+shell-env
+llm-interface
+filesystem
+general
+```
+
+`config.yoml` 里提供的是注释模板。你可以取消注释并改成自己的项目分类，例如前端项目：
+
+```yoml
+# mistake_categories:
+#   - id: style
+#     title: "样式错题集"
+#     tags: ["frontend", "style", "css"]
+#     description: "CSS、布局、响应式、组件视觉、主题变量、设计还原相关问题。"
+#
+#   - id: build
+#     title: "构建错误错题集"
+#     tags: ["frontend", "build", "tooling"]
+#     description: "Vite、Webpack、包管理器、依赖版本、构建脚本和 CI 构建失败。"
+```
+
+启用后应写成：
 
 ```yoml
 mistake_categories:
@@ -139,7 +165,9 @@ mistake_categories:
 Claude Code 的 `/detour-capture` 和 `.claude/CLAUDE.md` reminder 都会提醒 Claude：
 
 ```text
-如果存在 .detour/config.yoml，先读取它，并优先使用 mistake_categories 作为文档分类、title 和 tags。
+如果存在 .detour/config.yoml 且其中启用了 mistake_categories，
+先读取它，并优先使用这些分类作为文档分类、title 和 tags。
+如果没有配置，则使用内置兜底分类。
 ```
 
 当前 detour 不强制解析 `config.yoml`；它是给 Claude / 团队看的分类规范。后续可以继续加 `detour save` 的强校验。

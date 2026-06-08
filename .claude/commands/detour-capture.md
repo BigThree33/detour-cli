@@ -6,9 +6,10 @@
 
 1. 找出本会话中已经出现的错误假设、命令失败、环境约束、权限问题、路径问题、API 误解或用户偏好遗漏。
 2. 不要编造不存在的错误或证据。
-3. 由你来分析错误现象、错误路径、根因、修正方式和下次预防规则。
-4. 按下面 JSON schema 生成最多 5 篇文档。
-5. 把 JSON 通过 stdin 传给 detour 保存。
+3. 如果存在 `.detour/config.yoml` 且其中启用了 `mistake_categories`，先读取它，并优先使用其中的分类作为文档分类、title 和 tags；如果没有配置，则使用兜底分类：`claude-code`、`rust-cli`、`shell-env`、`llm-interface`、`filesystem`、`general`。
+4. 由你来分析错误现象、错误路径、根因、修正方式和下次预防规则。
+5. 按下面 JSON schema 生成最多 5 篇文档。
+6. 把 JSON 通过 stdin 传给 detour 保存。
 
 JSON 顶层必须是：
 

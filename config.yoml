@@ -1,0 +1,64 @@
+# Detour category configuration template.
+#
+# This file is intentionally blank by default.
+# In a real project, copy it to:
+#
+#   .detour/config.yoml
+#
+# Then uncomment and edit the example below to define your own mistake-note
+# categories. If `.detour/config.yoml` does not exist or contains no active
+# categories, Claude/detour should fall back to the built-in default categories:
+#
+#   claude-code
+#   rust-cli
+#   shell-env
+#   llm-interface
+#   filesystem
+#   general
+#
+# Example for a frontend project:
+#
+# version: 1
+#
+# generation:
+#   default_max_docs: 5
+#   output_dir: ".detour/mistakes"
+#   require_tags: true
+#   prefer_categories_from_config: true
+#
+# mistake_categories:
+#   - id: style
+#     title: "样式错题集"
+#     tags: ["frontend", "style", "css"]
+#     description: "CSS、布局、响应式、组件视觉、主题变量、设计还原相关问题。"
+#     examples:
+#       - "样式覆盖顺序错误"
+#       - "移动端布局溢出"
+#       - "组件间距和设计稿不一致"
+#
+#   - id: javascript
+#     title: "JS 逻辑错题集"
+#     tags: ["frontend", "javascript", "logic"]
+#     description: "JavaScript/TypeScript 逻辑、状态、异步、类型和运行时错误。"
+#     examples:
+#       - "异步请求状态没有正确回收"
+#       - "TypeScript 类型收窄失败"
+#       - "闭包或依赖数组导致旧状态"
+#
+#   - id: build
+#     title: "构建错误错题集"
+#     tags: ["frontend", "build", "tooling"]
+#     description: "Vite、Webpack、包管理器、依赖版本、构建脚本和 CI 构建失败。"
+#     examples:
+#       - "依赖版本不兼容"
+#       - "构建产物路径错误"
+#       - "环境变量缺失导致构建失败"
+#
+#   - id: network
+#     title: "网络请求错题集"
+#     tags: ["frontend", "network", "api"]
+#     description: "HTTP 请求、接口契约、鉴权、跨域、缓存、错误处理和超时问题。"
+#     examples:
+#       - "接口字段理解错误"
+#       - "未处理 401 或 500"
+#       - "CORS 或代理配置错误"

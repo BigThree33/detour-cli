@@ -33,6 +33,33 @@ Cargo 自动生成的依赖锁定文件。
 - 本项目是 CLI/binary 项目，`Cargo.lock` 应提交。
 - 不要手动编辑，通常由 `cargo build`、`cargo test`、`cargo update` 生成或更新。
 
+### `README.md`
+
+项目快速上手文档。
+
+主要负责：
+
+- 说明 detour 的目标和使用方式。
+- 说明 Claude Code 三层接入命令。
+- 说明 `.detour/config.yoml` 分类配置。
+- 说明修改功能规范时应该改哪些源码文件。
+
+### `config.yoml`
+
+错题分类配置注释模板。
+
+主要负责：
+
+- 给项目提供可复制的 `.detour/config.yoml` 空白模板。
+- 用注释展示前端、构建、网络等常见错题分类该怎么写。
+- 供 Claude Code `/detour-capture` 读取后决定文档 title 和 tags。
+
+协作注意：
+
+- 默认不启用任何自定义分类；没有配置时使用兜底分类。
+- 当前 Rust 代码还不强制解析这个文件，它主要是给 Claude / 团队看的分类规范。
+- 后续如果要强校验 tags，应在 `save.rs` 中读取并校验 `.detour/config.yoml`。
+
 ## 命令行入口
 
 ### `src/main.rs`
