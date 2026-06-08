@@ -406,18 +406,22 @@ Claude Code 项目级集成模块。
 - 生成 `.claude/commands/detour-capture.md`。
 - 生成 `.claude/commands/detour-rules.md`。
 - 安装或移除项目级 slash command 文件。
-- 打印后续阶段接入 PreCompact hook 时可参考的 settings JSON 片段。
+- 安装或移除项目级 `.claude/settings.json` 中的 PreCompact hook。
+- 打印 PreCompact hook 的 settings JSON 片段。
 - 执行 `run-precompact`，从 Claude Code hook stdin 读取 `transcript_path` 并生成错题集。
 
 当前默认写入：
 
 - `.claude/commands/detour-capture.md`
 - `.claude/commands/detour-rules.md`
+- `.claude/settings.json`
+- `.claude/settings.detour-backup*.json`
 
 协作注意：
 
-- 当前阶段只写项目目录内的 `.claude/commands/`，不自动修改用户级 `~/.claude/settings.json`。
-- 当前已经实现 `run-precompact` 的 transcript 读取和错题集生成，但自动写入 `.claude/settings.json` 安装 PreCompact hook 仍是后续阶段能力。
+- 当前只写项目目录内的 `.claude/`，不自动修改用户级 `~/.claude/settings.json`。
+- 安装 PreCompact hook 前会备份已有 `.claude/settings.json`。
+- 卸载 PreCompact hook 时只移除 detour 自己写入的 command，不移除用户已有 hook。
 - 如果 Claude Code slash command 内容变化，应同步检查 `skills.rs` 和 `llm.rs` 的调用说明。
 
 ## 示例数据

@@ -11,10 +11,15 @@ use crate::models::{ConversationEvent, ConversationRole};
 use crate::skills::{default_skill_path, write_skill, SkillWriteResult};
 use crate::storage::{write_documents, SavedDocument, StoredDocumentFormat};
 
+const PRECOMPACT_COMMAND: &str = "detour hook claude run-precompact --max-docs 5 --json";
+const PRECOMPACT_MATCHERS: [&str; 2] = ["manual", "auto"];
+
 /// Claude Code 项目级集成状态。
 #[derive(Debug, Clone, Serialize)]
 pub struct ClaudeStatus {
     pub project_root: String,
+    pub settings_path: String,
+    pub precompact_installed: bool,
     pub skill_path: String,
     pub skill_installed: bool,
     pub capture_command_path: String,
@@ -87,12 +92,15 @@ struct ClaudeHookInput {
 
 /// 检测当前项目中的 Claude Code detour 集成状态。
 pub fn detect_claude_project(project_root: &Path) -> ClaudeStatus {
+    let settings_path = settings_path(project_root);
     let skill_path = project_root.join(default_skill_path(crate::cli::SkillTarget::Claude));
     let capture_command_path = capture_command_path(project_root);
     let rules_command_path = rules_command_path(project_root);
 
     ClaudeStatus {
         project_root: project_root.display().to_string(),
+        precompact_installed: precompact_hook_installed(&settings_path),
+        settings_path: settings_path.display().to_string(),
         skill_installed: skill_path.exists(),
         skill_path: skill_path.display().to_string(),
         capture_command_installed: capture_command_path.exists(),
@@ -116,9 +124,7 @@ pub fn install_claude_project(
     match mode {
         ClaudeHookMode::SlashCommand => install_slash_commands(project_root, force),
         ClaudeHookMode::SkillOnly => install_skill(project_root, force),
-        ClaudeHookMode::PreCompact => {
-            bail!("PreCompact hook install is not implemented yet; this will be stage 9")
-        }
+        ClaudeHookMode::PreCompact => install_precompact_hook(project_root),
         ClaudeHookMode::Wrapper => {
             bail!("wrapper install is not implemented yet")
         }
@@ -138,9 +144,7 @@ pub fn uninstall_claude_project(
     match mode {
         ClaudeHookMode::SlashCommand => uninstall_slash_commands(project_root),
         ClaudeHookMode::SkillOnly => uninstall_skill(project_root),
-        ClaudeHookMode::PreCompact => {
-            bail!("PreCompact hook uninstall is not implemented yet; this will be stage 9")
-        }
+        ClaudeHookMode::PreCompact => uninstall_precompact_hook(project_root),
         ClaudeHookMode::Wrapper => {
             bail!("wrapper uninstall is not implemented yet")
         }
@@ -157,7 +161,7 @@ pub fn precompact_config_snippet() -> serde_json::Value {
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "detour hook claude run-precompact --max-docs 5 --json"
+                            "command": PRECOMPACT_COMMAND
                         }
                     ]
                 },
@@ -166,7 +170,7 @@ pub fn precompact_config_snippet() -> serde_json::Value {
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "detour hook claude run-precompact --max-docs 5 --json"
+                            "command": PRECOMPACT_COMMAND
                         }
                     ]
                 }
@@ -540,6 +544,269 @@ fn truncate(input: &str, max_chars: usize) -> String {
     }
 }
 
+/// 安装 Claude Code PreCompact hook 到项目级 settings。
+fn install_precompact_hook(project_root: &Path) -> anyhow::Result<ClaudeInstallResult> {
+    let path = settings_path(project_root);
+    let overwritten = path.exists();
+    let mut settings = read_settings_or_empty(&path)?;
+    let changed = merge_precompact_hook(&mut settings)?;
+    let mut files = Vec::new();
+
+    if changed {
+        if overwritten {
+            let backup_path = backup_settings_file(&path)?;
+            files.push(ClaudeWrittenFile {
+                path: display_path(backup_path),
+                overwritten: false,
+            });
+        }
+
+        write_settings(&path, &settings)?;
+    }
+
+    files.push(ClaudeWrittenFile {
+        path: display_path(path),
+        overwritten,
+    });
+
+    Ok(ClaudeInstallResult {
+        mode: "pre-compact".to_string(),
+        files,
+    })
+}
+
+/// 从项目级 settings 中移除 detour 的 PreCompact hook。
+fn uninstall_precompact_hook(project_root: &Path) -> anyhow::Result<ClaudeUninstallResult> {
+    let path = settings_path(project_root);
+
+    if !path.exists() {
+        return Ok(ClaudeUninstallResult {
+            mode: "pre-compact".to_string(),
+            files: vec![ClaudeRemovedFile {
+                path: display_path(path),
+                removed: false,
+            }],
+        });
+    }
+
+    let mut settings = read_settings_or_empty(&path)?;
+    let changed = remove_precompact_hook(&mut settings)?;
+
+    if changed {
+        write_settings(&path, &settings)?;
+    }
+
+    Ok(ClaudeUninstallResult {
+        mode: "pre-compact".to_string(),
+        files: vec![ClaudeRemovedFile {
+            path: display_path(path),
+            removed: changed,
+        }],
+    })
+}
+
+/// 检查项目级 settings 中是否已经有 detour PreCompact hook。
+fn precompact_hook_installed(path: &Path) -> bool {
+    let Ok(settings) = read_settings_or_empty(path) else {
+        return false;
+    };
+
+    let Some(precompact) = settings
+        .get("hooks")
+        .and_then(Value::as_object)
+        .and_then(|hooks| hooks.get("PreCompact"))
+        .and_then(Value::as_array)
+    else {
+        return false;
+    };
+
+    PRECOMPACT_MATCHERS.iter().all(|matcher| {
+        precompact
+            .iter()
+            .any(|entry| entry_has_detour_hook(entry, matcher))
+    })
+}
+
+/// 读取 settings；不存在时返回空对象。
+fn read_settings_or_empty(path: &Path) -> anyhow::Result<Value> {
+    if !path.exists() {
+        return Ok(serde_json::json!({}));
+    }
+
+    let content = fs::read_to_string(path)
+        .with_context(|| format!("failed to read Claude Code settings {}", path.display()))?;
+    let settings = serde_json::from_str(&content)
+        .with_context(|| format!("failed to parse Claude Code settings {}", path.display()))?;
+
+    Ok(settings)
+}
+
+/// 写入格式化后的 settings JSON。
+fn write_settings(path: &Path, settings: &Value) -> anyhow::Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "failed to create Claude Code settings directory {}",
+                parent.display()
+            )
+        })?;
+    }
+
+    fs::write(path, serde_json::to_string_pretty(settings)?)
+        .with_context(|| format!("failed to write Claude Code settings {}", path.display()))
+}
+
+/// 写入前备份已有 settings。
+fn backup_settings_file(path: &Path) -> anyhow::Result<PathBuf> {
+    let backup_path = unique_backup_path(path);
+    fs::copy(path, &backup_path).with_context(|| {
+        format!(
+            "failed to back up Claude Code settings from {} to {}",
+            path.display(),
+            backup_path.display()
+        )
+    })?;
+    Ok(backup_path)
+}
+
+/// 生成不覆盖旧备份的备份路径。
+fn unique_backup_path(path: &Path) -> PathBuf {
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let first = parent.join("settings.detour-backup.json");
+
+    if !first.exists() {
+        return first;
+    }
+
+    for index in 2.. {
+        let candidate = parent.join(format!("settings.detour-backup-{index}.json"));
+
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+
+    unreachable!("backup path loop should always return");
+}
+
+/// 合并 detour 的 PreCompact hook，保留用户已有 settings。
+fn merge_precompact_hook(settings: &mut Value) -> anyhow::Result<bool> {
+    let settings_object = settings
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("Claude Code settings must be a JSON object"))?;
+    let hooks = settings_object
+        .entry("hooks".to_string())
+        .or_insert_with(|| serde_json::json!({}));
+    let hooks_object = hooks
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("Claude Code settings field `hooks` must be an object"))?;
+    let precompact = hooks_object
+        .entry("PreCompact".to_string())
+        .or_insert_with(|| serde_json::json!([]));
+    let precompact_array = precompact.as_array_mut().ok_or_else(|| {
+        anyhow::anyhow!("Claude Code settings field `hooks.PreCompact` must be an array")
+    })?;
+    let mut changed = false;
+
+    for matcher in PRECOMPACT_MATCHERS {
+        if !precompact_array
+            .iter()
+            .any(|entry| entry_has_detour_hook(entry, matcher))
+        {
+            precompact_array.push(precompact_hook_entry(matcher));
+            changed = true;
+        }
+    }
+
+    Ok(changed)
+}
+
+/// 移除 detour 自己写入的 PreCompact hook，保留其他 hook。
+fn remove_precompact_hook(settings: &mut Value) -> anyhow::Result<bool> {
+    let Some(hooks_object) = settings.get_mut("hooks").and_then(Value::as_object_mut) else {
+        return Ok(false);
+    };
+    let Some(precompact_value) = hooks_object.get_mut("PreCompact") else {
+        return Ok(false);
+    };
+    let precompact_array = precompact_value.as_array_mut().ok_or_else(|| {
+        anyhow::anyhow!("Claude Code settings field `hooks.PreCompact` must be an array")
+    })?;
+    let before = precompact_array.clone();
+
+    for entry in precompact_array.iter_mut() {
+        remove_detour_hooks_from_entry(entry)?;
+    }
+
+    precompact_array.retain(|entry| {
+        entry
+            .get("hooks")
+            .and_then(Value::as_array)
+            .map(|hooks| !hooks.is_empty())
+            .unwrap_or(true)
+    });
+
+    let changed = before != *precompact_array;
+
+    if precompact_array.is_empty() {
+        hooks_object.remove("PreCompact");
+    }
+
+    Ok(changed)
+}
+
+/// 移除单个 PreCompact entry 中属于 detour 的 command hook。
+fn remove_detour_hooks_from_entry(entry: &mut Value) -> anyhow::Result<()> {
+    let Some(hooks) = entry.get_mut("hooks") else {
+        return Ok(());
+    };
+    let hooks_array = hooks
+        .as_array_mut()
+        .ok_or_else(|| anyhow::anyhow!("Claude Code hook entry field `hooks` must be an array"))?;
+
+    hooks_array.retain(|hook| !hook_is_detour_precompact_command(hook));
+
+    Ok(())
+}
+
+/// 判断某个 PreCompact entry 是否包含 detour command。
+fn entry_has_detour_hook(entry: &Value, matcher: &str) -> bool {
+    let matcher_matches = entry
+        .get("matcher")
+        .and_then(Value::as_str)
+        .map(|value| value == matcher)
+        .unwrap_or(false);
+
+    if !matcher_matches {
+        return false;
+    }
+
+    entry
+        .get("hooks")
+        .and_then(Value::as_array)
+        .map(|hooks| hooks.iter().any(hook_is_detour_precompact_command))
+        .unwrap_or(false)
+}
+
+/// 判断 hook 是否是 detour 的 PreCompact command。
+fn hook_is_detour_precompact_command(hook: &Value) -> bool {
+    hook.get("type").and_then(Value::as_str) == Some("command")
+        && hook.get("command").and_then(Value::as_str) == Some(PRECOMPACT_COMMAND)
+}
+
+/// 构造 detour 的 PreCompact hook 配置项。
+fn precompact_hook_entry(matcher: &str) -> Value {
+    serde_json::json!({
+        "matcher": matcher,
+        "hooks": [
+            {
+                "type": "command",
+                "command": PRECOMPACT_COMMAND
+            }
+        ]
+    })
+}
+
 /// 安装 Claude Code slash command 文件。
 fn install_slash_commands(project_root: &Path, force: bool) -> anyhow::Result<ClaudeInstallResult> {
     let files = vec![
@@ -639,6 +906,11 @@ fn remove_file(path: PathBuf) -> anyhow::Result<ClaudeRemovedFile> {
         path: path.display().to_string(),
         removed,
     })
+}
+
+/// 返回 Claude Code 项目级 settings 路径。
+fn settings_path(project_root: &Path) -> PathBuf {
+    project_root.join(".claude").join("settings.json")
 }
 
 /// 返回 capture slash command 的路径。
@@ -763,6 +1035,96 @@ mod tests {
         assert_eq!(result.files.len(), 2);
         assert!(!capture_command_path(&root).exists());
         assert!(!rules_command_path(&root).exists());
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn installs_precompact_settings() {
+        let root = unique_temp_dir("detour-precompact-install-test");
+        let result =
+            install_claude_project(&root, ClaudeHookMode::PreCompact, false, false).unwrap();
+        let status = detect_claude_project(&root);
+
+        assert_eq!(result.mode, "pre-compact");
+        assert!(settings_path(&root).exists());
+        assert!(status.precompact_installed);
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn installs_precompact_settings_with_backup_and_preserves_existing_hooks() {
+        let root = unique_temp_dir("detour-precompact-merge-test");
+        let settings_path = settings_path(&root);
+        fs::create_dir_all(settings_path.parent().unwrap()).unwrap();
+        fs::write(
+            &settings_path,
+            serde_json::to_string_pretty(&serde_json::json!({
+                "hooks": {
+                    "PreCompact": [
+                        {
+                            "matcher": "manual",
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "command": "echo keep-me"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+        let result =
+            install_claude_project(&root, ClaudeHookMode::PreCompact, false, false).unwrap();
+        let settings = read_settings_or_empty(&settings_path).unwrap();
+
+        assert!(result
+            .files
+            .iter()
+            .any(|file| file.path.contains("settings.detour-backup")));
+        assert!(serde_json::to_string(&settings)
+            .unwrap()
+            .contains("echo keep-me"));
+        assert!(precompact_hook_installed(&settings_path));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn uninstalls_precompact_settings_without_removing_other_hooks() {
+        let root = unique_temp_dir("detour-precompact-uninstall-test");
+        install_claude_project(&root, ClaudeHookMode::PreCompact, false, false).unwrap();
+        let settings_path = settings_path(&root);
+        let mut settings = read_settings_or_empty(&settings_path).unwrap();
+
+        settings
+            .pointer_mut("/hooks/PreCompact")
+            .and_then(Value::as_array_mut)
+            .unwrap()
+            .push(serde_json::json!({
+                "matcher": "manual",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "echo keep-me"
+                    }
+                ]
+            }));
+        write_settings(&settings_path, &settings).unwrap();
+
+        let result = uninstall_claude_project(&root, ClaudeHookMode::PreCompact, false).unwrap();
+        let settings = read_settings_or_empty(&settings_path).unwrap();
+        let settings_text = serde_json::to_string(&settings).unwrap();
+
+        assert_eq!(result.mode, "pre-compact");
+        assert!(result.files[0].removed);
+        assert!(!settings_text.contains(PRECOMPACT_COMMAND));
+        assert!(settings_text.contains("echo keep-me"));
 
         let _ = fs::remove_dir_all(root);
     }

@@ -136,6 +136,11 @@ fn main() -> Result<()> {
                         println!("Claude Code project integration");
                         println!("project_root: {}", status.project_root);
                         println!(
+                            "precompact hook: {} ({})",
+                            status.settings_path,
+                            installed_label(status.precompact_installed)
+                        );
+                        println!(
                             "skill: {} ({})",
                             status.skill_path,
                             installed_label(status.skill_installed)

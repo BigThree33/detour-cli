@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "command": "detour hook claude run-precompact --max-docs 5 --json",
+            "type": "command"
+          }
+        ],
+        "matcher": "manual"
+      },
+      {
+        "hooks": [
+          {
+            "command": "detour hook claude run-precompact --max-docs 5 --json",
+            "type": "command"
+          }
+        ],
+        "matcher": "auto"
+      }
+    ]
+  }
+}
